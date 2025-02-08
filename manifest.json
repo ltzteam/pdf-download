@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "智慧中小学 PDF 下载助手",
+  "version": "1.0",
+  "description": "帮助下载网页中的 PDF 文件",
+  "permissions": [
+    "downloads",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "*://*.ykt.cbern.com.cn/*",
+    "*://*.r3-ndr.ykt.cbern.com.cn/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"]
+    }
+  ]
+} 
