@@ -49,7 +49,7 @@ function getPDFTitle() {
   return null;
 }
 
-function waitForElement(selector, timeout = 10000) {
+function waitForElement(selector, timeout = 3000) {
   return new Promise((resolve, reject) => {
     const startTime = Date.now();
     
@@ -67,7 +67,7 @@ function waitForElement(selector, timeout = 10000) {
         return;
       }
       
-      setTimeout(checkElement, 500);
+      setTimeout(checkElement, 100);
     };
     
     checkElement();
@@ -78,60 +78,53 @@ async function findPDFLinks() {
   const links = [];
   
   try {
-    // 等待 iframe 加载
+    // 等待 iframe 加载，设置较短的超时时间
     const iframe = await waitForElement('pdfPlayerFirefox');
     console.log('找到 PDF iframe:', iframe);
     
-    // 等待 iframe 的 src 属性设置完成
+    // 缩短等待src的时间
     if (!iframe.src) {
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, 500));
     }
     
     const src = iframe.src;
+    if (!src) {
+      throw new Error('iframe src 为空');
+    }
+    
     console.log('iframe src:', src);
     
-    if (src) {
+    const url = new URL(src);
+    let pdfUrl = url.searchParams.get('file');
+    let headers = url.searchParams.get('headers');
+    
+    console.log('从iframe提取的PDF URL:', pdfUrl);
+    
+    if (!pdfUrl) {
+      throw new Error('未找到PDF URL');
+    }
+    
+    pdfUrl = processUrl(pdfUrl);
+    
+    // 解析headers
+    let parsedHeaders = null;
+    if (headers) {
       try {
-        const url = new URL(src);
-        let pdfUrl = url.searchParams.get('file');
-        let headers = url.searchParams.get('headers');
-        
-        console.log('从iframe提取的PDF URL:', pdfUrl);
-        console.log('从iframe提取的headers:', headers);
-        
-        if (pdfUrl) {
-          pdfUrl = processUrl(pdfUrl);
-          
-          // 解析headers
-          let parsedHeaders = null;
-          if (headers) {
-            try {
-              parsedHeaders = JSON.parse(decodeURIComponent(headers));
-              console.log('解析后的headers:', parsedHeaders);
-            } catch (e) {
-              console.error('解析headers时出错:', e);
-            }
-          }
-          
-          const decodedUrl = decodeURIComponent(pdfUrl);
-          const fileName = decodedUrl.split('/').pop().replace(/_\d+\.pdf$/, '.pdf');
-          
-          console.log('最终PDF信息:', {
-            url: pdfUrl,
-            fileName: fileName,
-            headers: parsedHeaders
-          });
-          
-          links.push({
-            url: pdfUrl,
-            text: fileName,
-            headers: parsedHeaders
-          });
-        }
+        parsedHeaders = JSON.parse(decodeURIComponent(headers));
       } catch (e) {
-        console.error('解析PDF URL时出错:', e);
+        console.error('解析headers时出错:', e);
       }
     }
+    
+    const decodedUrl = decodeURIComponent(pdfUrl);
+    const fileName = decodedUrl.split('/').pop().replace(/_\d+\.pdf$/, '.pdf');
+    
+    links.push({
+      url: pdfUrl,
+      text: fileName,
+      headers: parsedHeaders
+    });
+    
   } catch (e) {
     console.error('查找PDF链接时出错:', e);
   }

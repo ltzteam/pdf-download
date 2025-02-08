@@ -12,11 +12,37 @@
       padding: 8px;
       margin: 5px 0;
     }
+    .loading {
+      text-align: center;
+      padding: 20px 0;
+    }
+    .spinner {
+      width: 40px;
+      height: 40px;
+      margin: 0 auto;
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #3498db;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .message {
+      margin-top: 10px;
+      color: #666;
+    }
   </style>
 </head>
 <body>
   <h3>PDF 下载助手</h3>
-  <div id="pdfList"></div>
+  <div id="pdfList">
+    <div class="loading">
+      <div class="spinner"></div>
+      <div class="message">正在扫描PDF文件...</div>
+    </div>
+  </div>
   <script src="popup.js"></script>
 </body>
 </html> 
