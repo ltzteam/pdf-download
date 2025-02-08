@@ -6,34 +6,91 @@ function processUrl(url) {
   return processedUrl;
 }
 
-function findPDFLinks() {
-  const links = [];
-  
-  // 查找普通的PDF链接
-  const allLinks = document.getElementsByTagName('a');
-  for (const link of allLinks) {
-    const href = link.href.toLowerCase();
-    if (href.endsWith('.pdf') || href.includes('.pdf?')) {
-      console.log('找到普通PDF链接:', href);
-      links.push({
-        url: processUrl(link.href),
-        text: link.textContent.trim() || '未命名PDF',
-        headers: null
-      });
+function getPDFTitle() {
+  // 尝试从URL中获取文件名（URL中包含了完整的书名）
+  const pdfIframe = document.getElementById('pdfPlayerFirefox');
+  if (pdfIframe && pdfIframe.src) {
+    try {
+      const url = new URL(pdfIframe.src);
+      const fileUrl = url.searchParams.get('file');
+      if (fileUrl) {
+        const decodedUrl = decodeURIComponent(fileUrl);
+        // 从路径中提取文件名
+        const fileName = decodedUrl.split('/').pop();
+        // 移除文件名末尾的时间戳（如果存在）
+        const cleanName = fileName.replace(/_\d+\.pdf$/, '.pdf');
+        return cleanName;
+      }
+    } catch (e) {
+      console.error('解析PDF文件名时出错:', e);
     }
   }
-  
-  // 查找iframe中的PDF
-  const iframes = document.getElementsByTagName('iframe');
-  console.log('找到的iframe数量:', iframes.length);
-  
-  for (const iframe of iframes) {
-    const src = iframe.src || '';
-    console.log('检查iframe src:', src);
+
+  // 尝试从父窗口获取标题
+  try {
+    // 尝试从页面中获取标题
+    const titleElement = document.querySelector('.book-title, .pdf-title, h1');
+    if (titleElement) {
+      return titleElement.textContent.trim();
+    }
     
-    // 特别处理 pdfPlayerFirefox iframe
-    if (iframe.id === 'pdfPlayerFirefox') {
-      console.log('找到 pdfPlayerFirefox iframe');
+    // 尝试从面包屑导航获取
+    const breadcrumb = document.querySelector('.breadcrumb');
+    if (breadcrumb) {
+      const lastItem = breadcrumb.lastElementChild;
+      if (lastItem) {
+        return lastItem.textContent.trim();
+      }
+    }
+  } catch (e) {
+    console.error('获取页面标题时出错:', e);
+  }
+  
+  return null;
+}
+
+function waitForElement(selector, timeout = 10000) {
+  return new Promise((resolve, reject) => {
+    const startTime = Date.now();
+    
+    const checkElement = () => {
+      const element = document.getElementById(selector);
+      if (element) {
+        console.log('找到元素:', selector);
+        resolve(element);
+        return;
+      }
+      
+      if (Date.now() - startTime > timeout) {
+        console.log('等待元素超时:', selector);
+        reject(new Error('等待元素超时'));
+        return;
+      }
+      
+      setTimeout(checkElement, 500);
+    };
+    
+    checkElement();
+  });
+}
+
+async function findPDFLinks() {
+  const links = [];
+  
+  try {
+    // 等待 iframe 加载
+    const iframe = await waitForElement('pdfPlayerFirefox');
+    console.log('找到 PDF iframe:', iframe);
+    
+    // 等待 iframe 的 src 属性设置完成
+    if (!iframe.src) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+    
+    const src = iframe.src;
+    console.log('iframe src:', src);
+    
+    if (src) {
       try {
         const url = new URL(src);
         let pdfUrl = url.searchParams.get('file');
@@ -57,7 +114,7 @@ function findPDFLinks() {
           }
           
           const decodedUrl = decodeURIComponent(pdfUrl);
-          const fileName = decodedUrl.split('/').pop().split('?')[0];
+          const fileName = decodedUrl.split('/').pop().replace(/_\d+\.pdf$/, '.pdf');
           
           console.log('最终PDF信息:', {
             url: pdfUrl,
@@ -67,7 +124,7 @@ function findPDFLinks() {
           
           links.push({
             url: pdfUrl,
-            text: fileName || '未命名PDF',
+            text: fileName,
             headers: parsedHeaders
           });
         }
@@ -75,53 +132,32 @@ function findPDFLinks() {
         console.error('解析PDF URL时出错:', e);
       }
     }
+  } catch (e) {
+    console.error('查找PDF链接时出错:', e);
   }
   
   console.log('找到的所有PDF链接:', links);
   return links;
 }
 
-// 定期检查PDF链接
-function checkForPDFs() {
-  const pdfLinks = findPDFLinks();
-  if (pdfLinks.length > 0) {
-    console.log('找到PDF链接，停止检查');
-    return pdfLinks;
-  }
-  
-  // 如果没有找到PDF链接，继续检查
-  console.log('未找到PDF链接，1秒后重试');
-  setTimeout(checkForPDFs, 1000);
-}
-
 // 监听消息
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action === 'findPDFs') {
-    // 开始检查PDF链接
-    const pdfLinks = findPDFLinks();
-    if (pdfLinks.length > 0) {
-      sendResponse({ pdfLinks });
-    } else {
-      // 如果没有立即找到，开始定期检查
-      setTimeout(() => {
-        const retryLinks = findPDFLinks();
-        sendResponse({ pdfLinks: retryLinks });
-      }, 1000);
-      return true; // 保持消息通道开放
-    }
+  if (request.action === 'ping') {
+    sendResponse({ status: 'ok' });
+    return;
   }
-});
-
-// 页面加载完成后开始检查
-document.addEventListener('DOMContentLoaded', () => {
-  console.log('页面加载完成，开始检查PDF');
-  checkForPDFs();
+  
+  if (request.action === 'findPDFs') {
+    findPDFLinks().then(pdfLinks => {
+      sendResponse({ pdfLinks });
+    });
+    return true; // 保持消息通道开放
+  }
 });
 
 // 监听动态内容变化
 const observer = new MutationObserver((mutations) => {
-  console.log('检测到页面变化，重新检查PDF');
-  checkForPDFs();
+  console.log('检测到页面变化');
 });
 
 observer.observe(document.body, {
