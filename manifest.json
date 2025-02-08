@@ -5,12 +5,16 @@
   "description": "帮助下载网页中的 PDF 文件",
   "permissions": [
     "downloads",
-    "activeTab"
+    "activeTab",
+    "webRequest"
   ],
   "host_permissions": [
     "*://*.ykt.cbern.com.cn/*",
     "*://*.r3-ndr.ykt.cbern.com.cn/*"
   ],
+  "background": {
+    "service_worker": "background.js"
+  },
   "action": {
     "default_popup": "popup.html",
     "default_icon": {

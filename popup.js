@@ -8,23 +8,15 @@ document.addEventListener('DOMContentLoaded', () => {
           const button = document.createElement('button');
           button.textContent = `下载: ${pdf.text}`;
           button.onclick = () => {
-            // 创建下载选项
-            const downloadOptions = {
+            const filename = pdf.text.replace(/[<>:"/\\|?*]/g, '_') + '.pdf';
+            
+            // 发送消息给 background script 处理下载
+            chrome.runtime.sendMessage({
+              action: 'downloadWithHeaders',
               url: pdf.url,
-              filename: pdf.text.replace(/[<>:"/\\|?*]/g, '_') + '.pdf'
-            };
-
-            // 如果有headers，添加到URL中
-            if (pdf.headers) {
-              const urlObj = new URL(pdf.url);
-              // 将headers作为查询参数添加到URL中
-              Object.entries(pdf.headers).forEach(([key, value]) => {
-                urlObj.searchParams.append(key, value);
-              });
-              downloadOptions.url = urlObj.toString();
-            }
-
-            chrome.downloads.download(downloadOptions);
+              filename: filename,
+              headers: pdf.headers
+            });
           };
           pdfList.appendChild(button);
         });
